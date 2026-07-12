@@ -1,0 +1,7 @@
+<clock offset="localtime">
+  <timer name="rtc" tickpolicy="catchup"/>
+  <timer name="pit" present="no" tickpolicy="discard"/>
+  <timer name="hpet" present="no"/>
+  <timer name="hypervclock" present="yes"/>
+  <timer name="tsc" present="yes" mode="native"/>
+</clock>

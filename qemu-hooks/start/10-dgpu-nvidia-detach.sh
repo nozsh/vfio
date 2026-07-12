@@ -1,0 +1,1 @@
+../dgpu/nvidia/detach.sh

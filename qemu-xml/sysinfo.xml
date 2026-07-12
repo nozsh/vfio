@@ -1,0 +1,22 @@
+<sysinfo type="smbios">
+  <bios>
+    <entry name="vendor">Microsoft Corporation</entry>
+    <entry name="version">Hyper-V</entry>
+  </bios>
+  <system>
+    <entry name="manufacturer">Microsoft Corporation</entry>
+    <entry name="product">Virtual Machine</entry>
+    <entry name="version">9.0</entry>
+    <entry name="serial">YOUR_SERIAL_from_baseboard-serial-number</entry>
+    <entry name="uuid">YOUR_UUID</entry>
+    <entry name="family">Virtual Machine</entry>
+  </system>
+  <baseBoard>
+    <entry name="manufacturer">Microsoft Corporation</entry>
+    <entry name="product">Virtual Machine</entry>
+  </baseBoard>
+  <chassis>
+    <entry name="manufacturer">Microsoft Corporation</entry>
+    <entry name="version">Hyper-V</entry>
+  </chassis>
+</sysinfo>
