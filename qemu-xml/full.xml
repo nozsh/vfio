@@ -3,6 +3,10 @@
 - <mac/>
 - <uuid>
 - <entry name="uuid">
+
+- - -
+
+This is my PERSONAL XML file, which means it is NOT universal and is for reference only. And this XML file for AMD CPU.
 \ -->
 
 <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
