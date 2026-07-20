@@ -1,8 +1,8 @@
 <!-- /
   Masked:
 - <uuid>
-- <mac/>
 - <entry name="uuid">
+- <mac/>
 
 - - -
 
@@ -226,14 +226,17 @@ And this XML file for AMD CPU.
     <input type="mouse" bus="ps2"/>
     <input type="keyboard" bus="ps2"/>
     <input type="evdev">
-      <source dev="/dev/input/by-id/usb-COMPANY_USB_Device-if01-event-mouse"/>
+      <source dev="/dev/input/by-id/usb-PIXART_Wired_Gaming_Mouse-if01-event-mouse"/>
     </input>
     <input type="evdev">
-      <source dev="/dev/input/by-id/usb-I-CHIP_MMD_KM40_Receiver_1234-event-kbd" grab="all" repeat="on"/>
+      <source dev="/dev/input/by-id/usb-PIXART_Wired_Gaming_Mouse-event-kbd" repeat="on"/>
+    </input>
+    <input type="evdev">
+      <source dev="/dev/input/by-id/vm-keyboard-event-kbd" grab="all" repeat="on"/>
     </input>
     <tpm model="tpm-crb">
-      <backend type="passthrough">
-        <device path="/dev/tpm0"/>
+      <backend type="emulator" version="2.0">
+        <profile name="default-v1"/>
       </backend>
     </tpm>
     <sound model="ich9">
