@@ -64,7 +64,7 @@ And this XML file for AMD CPU.
     </chassis>
   </sysinfo>
   <os firmware="efi">
-    <type arch="x86_64" machine="pc-q35-10.2">hvm</type>
+    <type arch="x86_64" machine="pc-q35-11.0">hvm</type>
     <firmware>
       <feature enabled="yes" name="enrolled-keys"/>
       <feature enabled="yes" name="secure-boot"/>
