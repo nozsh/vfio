@@ -11,7 +11,9 @@
   - 10 - stop
   - 20 - work
 
-<figure>
-  <img src="assets/rpm-fake-fan-curve-example.webp" alt="Example of use gpu-rpm-lock in a fan curve.">
-  <figcaption><em>Example of use <code>gpu-rpm-lock</code> in a fan curve.</em></figcaption>
-</figure>
+<div align="center">
+  <figure>
+    <img src="assets/rpm-fake-fan-curve-example.webp" alt="Example of use gpu-rpm-lock in a fan curve.">
+    <figcaption><sub>Example of use <code>gpu-rpm-lock</code> in a fan curve.</sub></figcaption>
+  </figure>
+</div>
