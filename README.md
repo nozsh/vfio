@@ -4,7 +4,7 @@
 
 ---
 
-### Script: NVIDIA Temperature Guest --> Host Passthrough
+### Script: NVIDIA Temperature Guest → Host Passthrough
 
 - `/dev/shm/gpu-temp` - Temperature
 - `/dev/shm/gpu-rpm-lock` - Fans (true/false, not speed)
