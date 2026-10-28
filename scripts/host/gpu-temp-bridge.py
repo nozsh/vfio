@@ -13,24 +13,33 @@ import time
 # Configuration
 # ---------------------------------------------------------------------------
 
-VM_NAME = "win11"                          # VM name
+VM_NAME = "win11"                           # VM name
 SOCK_GLOB = f"/run/libvirt/qemu/channel/*-{VM_NAME}/org.local.gpu-temp"
 
-GPU_PCI_ADDRESS = "0000:01:00.0"           # dGPU PCI address, find out with: lspci -D | grep -i nvidia
+GPU_PCI_ADDRESS = "0000:01:00.0"            # dGPU PCI address, find out with: lspci -D | grep -i nvidia
 
-OUT_PATH = "/dev/shm/gpu-temp"             # where we write the resulting value
+OUT_PATH = "/dev/shm/gpu-temp"              # where we write the resulting temperature
+OUT_RPM_LOCK_PATH = "/dev/shm/gpu-rpm-lock" # fan on/off, faked as a "temperature" sensor
 
-STALE_AFTER = 5.0                          # sec - after this, guest data is considered stale
-FALLBACK_TEMP = 50                         # used if neither host nor guest is available
+STALE_AFTER = 5.0                           # sec - after this, guest data is considered stale
+FALLBACK_TEMP = 50                          # used if neither host nor guest is available
 
-RECONNECT_DELAY = 2.0                      # sec - pause before reconnecting after a real disconnect
-SOCK_POLL_DELAY = 3.0                      # sec - pause if the VM socket hasn't appeared yet
+RECONNECT_DELAY = 2.0                       # sec - pause before reconnecting after a real disconnect
+SOCK_POLL_DELAY = 3.0                       # sec - pause if the VM socket hasn't appeared yet
+
+# fan-lock "temperature" values consumed by the fan-curve software:
+# 10 = dGPU fans are off (RPM/percent == 0), 20 = dGPU fans are spinning (>0),
+# 0 = neither host nor guest data available at all (clear/unknown state).
+FAN_LOCK_OFF = 10
+FAN_LOCK_ON = 20
+FAN_LOCK_NONE = 0
 
 # ---------------------------------------------------------------------------
 # Shared state (guest thread <-> main thread)
 # ---------------------------------------------------------------------------
 
 guest_temp = None
+guest_fan = None
 guest_temp_ts = 0.0
 lock = threading.Lock()
 
@@ -47,7 +56,7 @@ def guest_listener() -> None:
     """Runs in the background continuously. Keeps a single connection open
     for as long as needed - absence of data is NOT a reason to reconnect,
     only a real EOF/socket error is."""
-    global guest_temp, guest_temp_ts
+    global guest_temp, guest_fan, guest_temp_ts
 
     while True:
         sock_path = find_socket()
@@ -70,10 +79,11 @@ def guest_listener() -> None:
                 while b"\n" in buf:
                     line, buf = buf.split(b"\n", 1)
                     line = line.strip()
-                    m = re.match(rb"GPU:(\d+)", line)
+                    m = re.match(rb"GPU:(\d+);FAN:(\d+)", line)
                     if m:
                         with lock:
                             guest_temp = int(m.group(1))
+                            guest_fan = int(m.group(2))
                             guest_temp_ts = time.time()
 
         except OSError:
@@ -86,6 +96,7 @@ def guest_listener() -> None:
                     pass
             with lock:
                 guest_temp = None
+                guest_fan = None
             time.sleep(RECONNECT_DELAY)
 
 
@@ -107,7 +118,7 @@ def gpu_driver_name() -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Host side: temperature via NVML (ctypes), only when the GPU belongs to the host
+# Host side: temperature/fan via NVML (ctypes), only when the GPU belongs to the host
 # ---------------------------------------------------------------------------
 
 class NvmlBridge:
@@ -173,19 +184,32 @@ class NvmlBridge:
             return None
         return temp.value
 
+    def get_fan_speed(self) -> int | None:
+        """Returns fan speed as a percentage (0-100), as reported by NVML.
+        Note: on many NVIDIA cards this is a driver-side estimate rather than
+        a true tach reading, but it is reliably >0 iff the fans are spinning,
+        which is all the fan-lock trigger below needs."""
+        if not self._initialized:
+            return None
+        speed = ctypes.c_uint()
+        ret = self._lib.nvmlDeviceGetFanSpeed(self._device, ctypes.byref(speed))
+        if ret != self.NVML_SUCCESS:
+            return None
+        return speed.value
+
 
 # ---------------------------------------------------------------------------
 # Writing the result
 # ---------------------------------------------------------------------------
 
-def write_temp(temp_celsius: int) -> None:
+def write_millidegrees(path: str, value_celsius: int) -> None:
     """CoolerControl (like standard sysfs hwmon: tempN_input) expects
     an integer in millidegrees Celsius, e.g. 80000 for 80°C."""
-    millidegrees = int(temp_celsius) * 1000
-    tmp_path = OUT_PATH + ".tmp"
+    millidegrees = int(value_celsius) * 1000
+    tmp_path = path + ".tmp"
     with open(tmp_path, "w") as f:
         f.write(str(millidegrees))
-    os.replace(tmp_path, OUT_PATH)  # atomic replace
+    os.replace(tmp_path, path)  # atomic replace
 
 # ---------------------------------------------------------------------------
 # Main loop
@@ -209,28 +233,35 @@ def main() -> None:
     threading.Thread(target=guest_listener, daemon=True).start()
 
     last_source = None
+    last_fan_state = None
 
     while True:
         with lock:
-            gt, ts = guest_temp, guest_temp_ts
+            gt, gf, ts = guest_temp, guest_fan, guest_temp_ts
 
         if gt is not None and (time.time() - ts) < STALE_AFTER:
             source, temp = "guest", gt
+            fan_lock = FAN_LOCK_ON if gf and gf > 0 else FAN_LOCK_OFF
             nvml.release()
         else:
             driver = gpu_driver_name()
             if driver == "nvidia" and nvml.ensure_init():
                 host_temp = nvml.get_temp()
+                host_fan = nvml.get_fan_speed()
             else:
                 nvml.release()
                 host_temp = None
+                host_fan = None
 
             if host_temp is not None:
                 source, temp = "host", host_temp
+                fan_lock = FAN_LOCK_ON if host_fan and host_fan > 0 else FAN_LOCK_OFF
             else:
                 source, temp = "fallback", FALLBACK_TEMP
+                fan_lock = FAN_LOCK_NONE
 
-        write_temp(temp)
+        write_millidegrees(OUT_PATH, temp)
+        write_millidegrees(OUT_RPM_LOCK_PATH, fan_lock)
 
         if source != last_source:
             if source == "fallback":
@@ -239,6 +270,11 @@ def main() -> None:
             else:
                 print(f"Source switched to: {source} ({temp}°C)")
             last_source = source
+
+        if fan_lock != last_fan_state:
+            label = {FAN_LOCK_ON: "on", FAN_LOCK_OFF: "off", FAN_LOCK_NONE: "none/unknown"}[fan_lock]
+            print(f"Fan-lock state switched to: {label} ({fan_lock * 1000})")
+            last_fan_state = fan_lock
 
         time.sleep(1)
 

@@ -45,6 +45,9 @@ public static class Nvml {
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern int nvmlDeviceGetTemperature(IntPtr device, int sensorType, out uint temp);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int nvmlDeviceGetFanSpeed(IntPtr device, out uint speed);
 }
 "@
 }
@@ -87,6 +90,16 @@ function Get-GpuTemp {
     return [int]$temp
 }
 
+function Get-GpuFan {
+    # Called only right after a successful Get-GpuTemp, so NVML is already ready.
+    # NVML fan speed is a percentage (0-100); if the call fails, just report 0 -
+    # worst case the fan-lock trigger on the host briefly reads "off".
+    $fan = 0
+    $ret = [Nvml]::nvmlDeviceGetFanSpeed($script:nvmlDevice, [ref]$fan)
+    if ($ret -ne 0) { return 0 }
+    return [int]$fan
+}
+
 # ---------------------------------------------------------------------------
 # Opening the virtio-serial port
 # ---------------------------------------------------------------------------
@@ -126,7 +139,9 @@ try {
             continue
         }
 
-        $line = "GPU:$temp`n"
+        $fan = Get-GpuFan
+
+        $line = "GPU:$temp;FAN:$fan`n"
         $bytes = [System.Text.Encoding]::ASCII.GetBytes($line)
         $written = 0
         $ok = [Vioser]::WriteFile($h, $bytes, $bytes.Length, [ref]$written, [IntPtr]::Zero)
@@ -141,7 +156,7 @@ try {
         if ($state -ne $lastState) {
             switch -Wildcard ($state) {
                 "host-disconnected" { Write-Host "Host not connected yet, waiting..." }
-                "streaming"         { Write-Host "Streaming to host (current: $temp C)" }
+                "streaming"         { Write-Host "Streaming to host (current: $temp C, fan: $fan%)" }
                 "write-error-*"     { Write-Host "Unexpected write error: $state" }
             }
             $lastState = $state
