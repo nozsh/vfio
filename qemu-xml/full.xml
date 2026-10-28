@@ -64,7 +64,7 @@ And this XML file for AMD CPU.
     </chassis>
   </sysinfo>
   <os firmware="efi">
-    <type arch="x86_64" machine="pc-q35-11.0">hvm</type>
+    <type arch="x86_64" machine="pc-q35-11.1">hvm</type>
     <firmware>
       <feature enabled="yes" name="enrolled-keys"/>
       <feature enabled="yes" name="secure-boot"/>
@@ -249,6 +249,12 @@ And this XML file for AMD CPU.
         <address domain="0x0000" bus="0x0d" slot="0x00" function="0x0"/>
       </source>
       <address type="pci" domain="0x0000" bus="0x04" slot="0x00" function="0x0"/>
+    </hostdev>
+    <hostdev mode="subsystem" type="pci" managed="yes">
+      <source>
+        <address domain="0x0000" bus="0x11" slot="0x00" function="0x3"/>
+      </source>
+      <address type="pci" domain="0x0000" bus="0x05" slot="0x00" function="0x0"/>
     </hostdev>
     <hostdev mode="subsystem" type="pci" managed="yes">
       <source>
